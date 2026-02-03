@@ -71,3 +71,5 @@ By using this app, you are exploring the **Latent Space of Human Knowledge**.
    `npm run dev`
 
 Or `npm run build` and drop the resulting `/dist` folder on a server somewhere.
+
+Sound samples from https://github.com/nbrosowsky/tonejs-instruments
