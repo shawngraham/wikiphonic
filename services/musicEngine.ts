@@ -1,137 +1,137 @@
 import * as Tone from 'tone';
 
-// When files are in /public/samples/, the base URL is just /samples
-const BASE = "/samples";
+const BASE = "./samples";
 
-const VOICE_CONFIGS = {
-  // Map the filename to the actual pitch of the recording so Tone.js can pitch-shift correctly
-  bass: { note: 'A#1', url: `${BASE}/bass-electric-As1.mp3` }, 
-  tenor: { note: 'A2', url: `${BASE}/cello-A2.mp3` },
-  alto: { note: 'A3', url: `${BASE}/french-horn-A3.mp3` },
-  soprano: { note: 'A4', url: `${BASE}/violin-A4.mp3` }
+interface VoiceConfig {
+  note: string;
+  url: string;
+  oct: number;
+  slice: [number, number];
+}
+
+const VOICE_CONFIGS: Record<string, VoiceConfig> = {
+  bass: { note: 'A#1', url: `${BASE}/bass-electric-As1.mp3`, oct: 1, slice: [0, 96] }, 
+  tenor: { note: 'A2', url: `${BASE}/cello-A2.mp3`, oct: 2, slice: [96, 192] },
+  alto: { note: 'A3', url: `${BASE}/french-horn-A3.mp3`, oct: 3, slice: [192, 288] },
+  soprano: { note: 'A4', url: `${BASE}/violin-A4.mp3`, oct: 4, slice: [288, 384] }
 };
+
+// Categorized scales for Mood Mapping
+const MODES = {
+  bright: [
+    ['C', 'D', 'E', 'Gb', 'G', 'A', 'B'], // Lydian (Extremely Bright)
+    ['C', 'D', 'E', 'F', 'G', 'A', 'B'],  // Major/Ionian (Cheerful)
+    ['C', 'D', 'E', 'F', 'G', 'A', 'Bb'], // Mixolydian (Warm/Positive)
+  ],
+  dark: [
+    ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'], // Aeolian/Minor (Sad/Serious)
+    ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'], // Dorian (Sophisticated/Dark)
+    ['C', 'Db', 'Eb', 'F', 'G', 'Ab', 'Bb'],// Phrygian (Very Dark/Tense)
+  ]
+};
+
+const ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 export type CompositionPhase = 'start' | 'traversal' | 'end' | 'idle';
 
 class MusicEngine {
   private samplers: Map<string, Tone.Sampler> = new Map();
-  private fallbacks: Map<string, Tone.PolySynth> = new Map();
+  private reverb: Tone.Reverb;
+  private delay: Tone.FeedbackDelay;
   private loop: Tone.Loop | null = null;
   
   public loadedStates: Record<string, boolean> = { bass: false, tenor: false, alto: false, soprano: false };
   public isInitialized = false;
-  
-  private currentMelodies: any[] = [];
-  public currentPhase: CompositionPhase = 'idle';
   private onPhaseChange?: (phase: CompositionPhase) => void;
+  public currentPhase: CompositionPhase = 'idle';
+  private currentIndices: number[] = [0, 0, 0, 0];
 
   constructor() {
-    this.initFallbacks();
-  }
-
-  private initFallbacks() {
-    const synthConfig = {
-      maxPolyphony: 4,
-      volume: -14, // Keep fallbacks quiet
-      envelope: { attack: 0.1, decay: 0.2, sustain: 0.4, release: 0.6 }
-    };
-    
-    this.fallbacks.set('bass', new Tone.PolySynth(Tone.FMSynth, synthConfig).toDestination());
-    this.fallbacks.set('tenor', new Tone.PolySynth(Tone.Synth, synthConfig).toDestination());
-    this.fallbacks.set('alto', new Tone.PolySynth(Tone.AMSynth, synthConfig).toDestination());
-    this.fallbacks.set('soprano', new Tone.PolySynth(Tone.DuoSynth, synthConfig).toDestination());
-  }
-
-  async load() {
-    if (Tone.context.state !== 'running') await Tone.start();
-    this.isInitialized = true;
-
-    const promises = Object.entries(VOICE_CONFIGS).map(([key, config]) => {
-      return new Promise<void>((resolve) => {
-        const sampler = new Tone.Sampler({
-          urls: { [config.note]: config.url },
-          onload: () => {
-            console.log(`✅ Local sample loaded: ${key}`);
-            this.loadedStates[key] = true;
-            resolve();
-          },
-          onerror: () => {
-            console.error(`❌ Local file missing: ${config.url}`);
-            this.loadedStates[key] = false;
-            resolve();
-          }
-        }).toDestination();
-        
-        sampler.volume.value = -4; 
-        this.samplers.set(key, sampler);
-      });
-    });
-
-    await Promise.all(promises);
-  }
-
-  private getVoiceMelody(vectorSlice: Float32Array, voiceIdx: number, stepCount: number = 16) {
-    const melody = [];
-    const scale = ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'];
-    for (let i = 0; i < stepCount; i++) {
-      const val = vectorSlice[i % vectorSlice.length];
-      const amplified = Math.tanh(val * 15);
-      melody.push({
-        noteIndex: Math.abs(Math.floor(amplified * 14)) % scale.length,
-        octaveShift: Math.floor(amplified * 2), 
-        gate: Math.abs(val * 25) > 0.5 + (voiceIdx * 0.1),
-        velocity: Math.min(1, Math.max(0.25, 0.5 + val * 5))
-      });
-    }
-    return melody;
+    this.reverb = new Tone.Reverb({ decay: 5, wet: 0.4 }).toDestination();
+    this.delay = new Tone.FeedbackDelay("8n.", 0.3).connect(this.reverb);
   }
 
   setPhaseCallback(cb: (phase: CompositionPhase) => void) {
     this.onPhaseChange = cb;
   }
 
+  async load() {
+    if (Tone.context.state !== 'running') await Tone.start();
+    this.isInitialized = true;
+    const promises = Object.keys(VOICE_CONFIGS).map((key) => {
+      const config = VOICE_CONFIGS[key];
+      return new Promise<void>((resolve) => {
+        const sampler = new Tone.Sampler({
+          urls: { [config.note]: config.url },
+          onload: () => { this.loadedStates[key] = true; resolve(); },
+          onerror: () => resolve()
+        }).connect(this.delay);
+        sampler.volume.value = -12; 
+        this.samplers.set(key, sampler);
+      });
+    });
+    await Promise.all(promises);
+  }
+
   async play(vector: Float32Array, phase: CompositionPhase) {
     if (Tone.context.state !== 'running') await Tone.start();
     this.stop();
-
     this.currentPhase = phase;
     if (this.onPhaseChange) this.onPhaseChange(phase);
 
-    this.currentMelodies = [
-      this.getVoiceMelody(vector.slice(0, 96), 0),
-      this.getVoiceMelody(vector.slice(96, 192), 1),
-      this.getVoiceMelody(vector.slice(192, 288), 2),
-      this.getVoiceMelody(vector.slice(288, 384), 3)
-    ];
+    // --- MOOD CLASSIFICATION ---
+    // We sum the first 50 dimensions. In many models, this captures "Net Polarity"
+    const netPolarity = vector.slice(0, 50).reduce((a, b) => a + b, 0);
+    
+    // Choose Major vs Minor list
+    const isBright = netPolarity > 0;
+    const moodPalette = isBright ? MODES.bright : MODES.dark;
+    
+    // Pick specific mode from palette based on how extreme the polarity is
+    const modeIndex = Math.min(moodPalette.length - 1, Math.floor(Math.abs(netPolarity) * 5));
+    const activeScale = moodPalette[modeIndex];
 
-    let sumSqr = 0;
-    for (const v of vector) sumSqr += v * v;
-    Tone.Transport.bpm.value = Math.min(160, Math.max(50, 60 + (Math.sqrt(sumSqr) * 250)));
+    // Root Note still unique to the article
+    const rootNote = ROOTS[Math.abs(Math.floor(vector[2] * 120)) % 12];
+    
+    // Tempo based on variance (Chaos)
+    const variance = vector.reduce((a, b) => a + Math.abs(b), 0) / vector.length;
+    Tone.Transport.bpm.value = 60 + (variance * 500);
+
+    this.currentIndices = [0, 1, 2, 3];
 
     let step = 0;
     this.loop = new Tone.Loop((time) => {
-      const voices = ['bass', 'tenor', 'alto', 'soprano'];
-      const baseOctaves = [1, 2, 3, 4];
-      const durations: Tone.Unit.Time[] = ["4n", "4n", "8n", "16n"];
-      const scale = ['C', 'D', 'Eb', 'F', 'G', 'Ab', 'Bb'];
+      const voiceKeys = ['bass', 'tenor', 'alto', 'soprano'];
 
-      voices.forEach((v, i) => {
-        const melody = this.currentMelodies[i];
-        const noteData = melody[step % melody.length];
+      voiceKeys.forEach((key, i) => {
+        const config = VOICE_CONFIGS[key];
+        const sampler = this.samplers.get(key);
+        if (!sampler || !this.loadedStates[key]) return;
+
+        const slice = vector.slice(config.slice[0], config.slice[1]);
+        const val = slice[step % slice.length];
+
+        // Interval-based melody movement
+        const jump = Math.round(val * 12);
+        this.currentIndices[i] = Math.abs(this.currentIndices[i] + jump) % activeScale.length;
         
-        if (noteData.gate || step % 16 === 0) {
-          const sampler = this.samplers.get(v);
-          const synth = this.fallbacks.get(v);
-          const finalNote = scale[noteData.noteIndex % scale.length] + (baseOctaves[i] + noteData.octaveShift);
+        const noteName = activeScale[this.currentIndices[i]];
+        let octave = config.oct;
+        if (Math.abs(val) > 0.07) octave += (val > 0 ? 1 : -1);
 
-          if (sampler && this.loadedStates[v]) {
-            // FIX: Release previous notes to prevent "Max Polyphony" buildup
-            sampler.releaseAll(time);
-            sampler.triggerAttackRelease(finalNote, durations[i], time, noteData.velocity);
-          } else if (synth) {
-            synth.releaseAll(time);
-            synth.triggerAttackRelease(finalNote, durations[i], time, noteData.velocity * 0.5);
-          }
+        const gateThreshold = 0.2 + (i * 0.1);
+        if (Math.abs(val * 25) > gateThreshold || step % 16 === 0) {
+          const finalNote = Tone.Frequency(noteName + octave).transpose(
+            ROOTS.indexOf(rootNote) - ROOTS.indexOf('C')
+          );
+
+          sampler.triggerAttackRelease(
+            finalNote, 
+            i === 0 ? "2n" : i === 1 ? "4n" : "16n", 
+            time, 
+            Math.min(0.8, 0.3 + Math.abs(val * 5))
+          );
         }
       });
       step++;
@@ -144,8 +144,6 @@ class MusicEngine {
     Tone.Transport.stop();
     Tone.Transport.cancel();
     this.samplers.forEach(s => s.releaseAll());
-    this.fallbacks.forEach(f => f.releaseAll());
-    
     if (this.loop) {
       this.loop.stop();
       this.loop.dispose();
@@ -153,14 +151,6 @@ class MusicEngine {
     }
     this.currentPhase = 'idle';
     if (this.onPhaseChange) this.onPhaseChange('idle');
-  }
-
-  async reset() {
-    this.stop();
-    this.samplers.forEach(s => s.dispose());
-    this.samplers.clear();
-    this.loadedStates = { bass: false, tenor: false, alto: false, soprano: false };
-    await this.load();
   }
 }
 
