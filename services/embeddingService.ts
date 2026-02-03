@@ -16,10 +16,12 @@ export const initModel = async (onProgress?: (progress: number) => void) => {
   });
 };
 
+
+
 export const getEmbedding = async (text: string): Promise<Float32Array> => {
   if (!embedder) await initModel();
   
-  const output = await embedder(text, { pooling: 'mean', normalize: true });
+  const output = await embedder(text, { pooling: 'mean', normalize: false });
   return output.data;
 };
 

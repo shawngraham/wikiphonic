@@ -1,6 +1,6 @@
-# Geospatial Sonifier
+# Wikiphonic: Geospatial Sonifier
 
-An experimental web application that transforms the semantic "latent space" of geographical landmarks into multi-voice orchestral compositions. By calculating the difference between two cultural or historical entities _as represented by the summary snippet from the associated Wikipedia article_, the app generates a unique auditory signature of their relationship.
+An experimental web application that transforms the semantic "latent space" of geographical landmarks into multi-voice orchestral compositions. By calculating the difference between two cultural or historical entities—as represented by the summary snippet from their associated Wikipedia articles—the app generates a unique auditory signature of their relationship.
 
 ## Architecture Overview
 
@@ -8,40 +8,40 @@ The application is built with a modern, on-device AI stack to ensure privacy, lo
 
 ### 1. Semantic Intelligence (Transformers.js)
 The core of the app is the **Sentence Transformer** model (`Xenova/all-MiniLM-L6-v2`).
-- **On-Device Inference:** Unlike typical AI apps, the NLP model is downloaded to the browser's cache and runs locally.
-- **Vectorization:** It transforms Wikipedia descriptions into 384-dimensional numerical vectors (embeddings). These vectors represent the "semantic DNA" of a place.
-- **The "Journey" Vector:** By subtracting the Origin vector from the Target vector, we calculate a **Difference Vector**. This represents the semantic shift required to move from one concept to another.
+- **On-Device Inference:** The NLP model is downloaded to the browser's cache and runs locally using ONNX Runtime.
+- **Raw Vectorization:** Unlike typical similarity-search apps, we disable normalization. This allows the **Magnitude** of the vector to represent the "Semantic Density" or "Energy" of the text. A short, simple description produces a quiet, minimal piece; a dense, complex history produces a high-energy composition.
+- **The "Journey" Vector:** By subtracting the Origin vector from the Target vector, we calculate a **Difference Vector**. This is the musical representation of the semantic distance between two places.
 
 ### 2. Audio Synthesis Engine (Tone.js)
-The `MusicEngine` is a hybrid sampler/synthesizer that operates across four classical voices:
-- **Orchestral Sampler:** High-fidelity samples (Double Bass, Cello, Viola, Violin) are pulled from a CDN. Well, that's the goal.
-- **Hybrid Fallback:** If the network blocks the samples, the engine automatically initializes specific synthesizers (FMSynth, AMSynth, etc.) to ensure the experience is never silent.
-- **Dynamic BPM:** The "Energy" of a semantic profile (calculated via vector magnitude) determines the tempo. Highly complex or "heavy" semantic entities result in more frantic tempos.
-
-### 3. Data Integration (Wikipedia & Geolocation)
-- **Contextual Search:** The app uses the browser's Geolocation API to find the user's current coordinates.
-- **Wiki Geosearch:** It queries the Wikipedia API for the 15 nearest landmarks, ensuring the "data" is always relevant to the user's physical surroundings.
+The `MusicEngine` uses a curated selection of orchestral samples from the **Philharmonia Sound Sample Library**, chosen for their ability to handle rapid, data-driven triggering.
+- **Bass:** *Bassoon* (A#1) — Provides a woody, foundational anchor.
+- **Tenor:** *French Horn* (A3) — Fills the mid-range with warm, brassy textures.
+- **Alto:** *Spiccato Violin* (A3) — Uses "bounced" bowing to handle 16th-note data streams with rhythmic clarity.
+- **Soprano:** *Flute* (A4) — Provides agile, airy melodic top-lines.
+- **Percussion:** A metrical section (Timpani/Toms, Woodblock, Triangle, Tam-tam) that anchors the data to a perceptible human pulse.
 
 ---
 
 ## The Sonification Logic
 
-**A Note on Interpretability:** In Transformer models, semantic information is *distributed*. There is no single dimension that represents "History" or "Nature." 
+### 1. Metaphorical Partitioning
+In Transformer models, information is distributed. We divide the 384 dimensions into four "Voices," giving each instrument a unique semantic window:
+- **Bass (0-95):** Broad semantic clusters.
+- **Tenor (96-191):** Cultural and functional features. Maybe. Who knows?
+- **Alto (192-287):** Historical and relational data. Maybe. Who knows?
+- **Soprano (288-383):** Specific stylistic and descriptive details. Maybe. Who knows?
 
-For this project, we employ a **Metaphorical Partitioning** strategy. We divide the 384 dimensions into four quadrants. This ensures each musical voice has a unique "identity" and reacts to a different slice of the model's internal data:
+### 2. Structural "Character" Mapping
+The first few dimensions of the vector are used as "Global Variables" that set the musical rules for each specific landmark:
+- **Time Signature ($v[0]$):** Determines if the piece "Waltzes" (3/4), remains steady (4/4), or feels tense and asymmetric (5/4).
+- **Articulation ($v[1]$):** Determines if the performance is *Legato* (smooth and flowing) or *Staccato* (short and prickly).
+- **Texture ($v[2]$):** Determines if the voices move together in chords (*Homophonic*) or chase each other independently (*Counterpoint*).
 
-1.  **Bass (0-95):** Interpreted here as the "foundation" or broad semantic clusters.
-2.  **Tenor (96-191):** Interpreted as mid-level cultural and functional features.
-3.  **Alto (192-287):** Interpreted as contextual and historical relational data.
-4.  **Soprano (288-383):** Interpreted as fine-grained, specific stylistic or descriptive details.
-
-But... we don't really know. Maybe there are ways of finding out.
-
-Each dimension influences:
--   **Pitch Selection:** Mapped to a Seven-Note Scale (C, D, Eb, F, G, Ab, Bb).
--   **Rhythmic Density:** Larger values increase the probability of a note triggering.
--   **Velocity:** The magnitude of the value determines the intensity of the performance.
-
+### 3. Rhythmic Adhesion
+To ensure the data doesn't sound like "random noise," the engine employs **Metrical Anchoring**:
+- The **Bassoon** and **Toms** are locked to the "Downbeat" (The 1).
+- The **French Horn** and **Woodblock** provide a steady backbeat pulse.
+- The **Violin** and **Flute** are the "Data Streamers," triggering notes only when semantic values cross a specific threshold.
 
 ---
 
@@ -50,19 +50,16 @@ Each dimension influences:
 By using this app, you are exploring the **Latent Space of Human Knowledge**.
 
 ### What to Listen For:
-- **The Origin vs. The Target:** Listen to how the "vibe" of a landmark changes. A park might sound airy and melodic, while a cathedral might sound dense and heavy in the bass register.
-- **The Journey (The Difference):** The "Journey" button plays the *subtraction* of the two. This is essentially the "musical ghost" of what makes the two landmarks different. If you compare two very similar parks, the Journey will be sparse and quiet. If you compare a Tech Hub to an Ancient Ruin, the Journey will be musically chaotic and complex.
-- **Semantic Consonance:** Notice how landmarks with shared history or function (e.g., two churches) tend to produce more harmonic relationships than unrelated entities (e.g., a stadium and a library).
+- **Semantic Energy:** Notice how a long, detailed history of an ancient ruin results in a faster BPM and denser orchestration than a small local park.
+- **The "Journey" (Difference Vector):** When you compare two landmarks, the music represents what makes them *different*. If you compare two similar cathedrals, the result will be quiet and minimalist. If you compare a skyscraper to a cemetery, the music will be harmonically and rhythmically complex.
+- **Character Shifts:** Look for how the "feel" of the rhythm changes. A specific landmark might trigger a 5/4 time signature, creating an "unbalanced" feeling that is unique to its semantic embedding.
 
 ## Technical Requirements
-- **Browser:** Modern Chrome, Firefox, or Edge (for Geolocation and Web Audio support).
-- **Audio:** Best experienced with headphones to hear the separation of the four orchestral voices.
-- **Network:** Requires an initial connection to download the NLP model (~23MB) and the orchestral samples. Once cached, the NLP runs entirely offline.
+- **Browser:** Modern Chrome, Firefox, or Edge.
+- **Audio:** Headphones are highly recommended to hear the spatial and frequency separation of the orchestral voices.
+- **Initial Load:** Requires a one-time download of the NLP model (~23MB) and the orchestral sample library.
 
 ## Run Locally
-
-**Prerequisites:**  Node.js
-
 
 1. Install dependencies:
    `npm install`
@@ -70,6 +67,5 @@ By using this app, you are exploring the **Latent Space of Human Knowledge**.
 2. Run the app:
    `npm run dev`
 
-Or `npm run build` and drop the resulting `/dist` folder on a server somewhere.
-
-Sound samples from https://github.com/nbrosowsky/tonejs-instruments
+---
+*Samples provided by the [Philharmonia Orchestra, London](https://philharmonia.co.uk/).*
